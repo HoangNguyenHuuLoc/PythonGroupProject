@@ -1,0 +1,278 @@
+import pygame
+import time
+import random
+import math
+import os
+pygame.init()
+pygame.font.init()
+pygame.mixer.init()
+width, height = 1920, 1080
+win = pygame.display.set_mode((width, height))
+pygame.display.set_caption("Space Dodge")
+# ==== IMG ====
+bg = pygame.transform.scale(pygame.image.load("BG.png"), (width, height))
+player1_img = pygame.transform.scale(pygame.image.load("spaceship.png"), (80, 80))
+player2_img = pygame.transform.scale(pygame.image.load("spaceship.png"), (80, 80))
+player2_img.fill((255, 60, 60), special_flags=pygame.BLEND_MULT)
+meteor_img = pygame.transform.scale(pygame.image.load("meteor.png"), (80, 80))
+# ==== Font ====
+font_big = pygame.font.Font(None, 150)
+font_medium = pygame.font.Font(None, 70)
+font_small = pygame.font.Font(None, 40)
+# ===TXT====
+def draw_text(surface, text, font, color, pos, center=True):
+    txt = font.render(text, True, color)
+    if center:
+        surface.blit(txt, (pos[0] - txt.get_width() // 2, pos[1] - txt.get_height() // 2))
+    else:
+        surface.blit(txt, pos)
+# ==== Lưu điểm ====
+def save_score(name, score):
+    try:
+        with open("leaderboard.txt", "a", encoding="utf-8") as f:
+            f.write(f"{name},{int(score)}\n")
+    except:
+        pass
+def load_scores():
+    if not os.path.exists("leaderboard.txt"):
+        return []
+    scores = []
+    with open("leaderboard.txt", "r", encoding="utf-8") as f:
+        for line in f:
+            if "," in line:
+                name, score = line.strip().split(",", 1)
+                try:
+                    scores.append((name, float(score)))
+                except:
+                    pass
+    scores.sort(key=lambda x: x[1], reverse=True)
+    return scores[:5]
+# ==Player input name====
+def get_player_name(player_label):
+    name = ""
+    clock = pygame.time.Clock()
+    while True:
+        clock.tick(60)
+        win.blit(bg, (0, 0))
+        draw_text(win, f"Enter Name {player_label}:", font_medium, (255, 255, 255), (width // 2, 400))
+        draw_text(win, name or "_", font_big, (180, 220, 255), (width // 2, 520))
+        draw_text(win, "Press Enter to Confirm", font_small, (200, 200, 255), (width // 2, 680))
+        pygame.display.update()
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                exit()
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_RETURN and name.strip():
+                    return name.strip()
+                elif event.key == pygame.K_BACKSPACE:
+                    name = name[:-1]
+                elif len(name) < 10 and event.unicode.isprintable():
+                    name += event.unicode
+# ====BXH====
+def show_leaderboard():
+    clock = pygame.time.Clock()
+    running = True
+    scores = load_scores()
+    while running:
+        clock.tick(60)
+        win.blit(bg, (0, 0))
+        draw_text(win, " LEADERBOARD ", font_big, (255, 230, 90), (width // 2, 120))
+        y_start = 300
+        if not scores:
+            draw_text(win, "No player yet", font_medium, (200, 200, 255), (width // 2, 500))
+        else:
+            for i, (name, score) in enumerate(scores):
+                rank = i + 1
+                if rank == 1:
+                    color = (255, 215, 0)
+                    bg_color = (70, 60, 10)
+                elif rank == 2:
+                    color = (192, 192, 192)
+                    bg_color = (50, 50, 50)
+                elif rank == 3:
+                    color = (205, 127, 50)
+                    bg_color = (45, 30, 10)
+                else:
+                    color = (200, 220, 255)
+                    bg_color = (25, 25, 40)
+                rect = pygame.Rect(width // 2 - 400, y_start + i * 100 - 40, 800, 80)
+                pygame.draw.rect(win, bg_color, rect, border_radius=20)
+                pygame.draw.rect(win, color, rect, 3, border_radius=20)
+                draw_text(win, f"{rank}. {name}", font_medium, color, (width // 2 - 150, y_start + i * 100))
+                draw_text(win, f"{int(score)}", font_medium, color, (width // 2 + 250, y_start + i * 100))
+        draw_text(win, "ESC to go back MENU", font_small, (180, 180, 255), (width // 2, height - 100))
+        pygame.display.update()
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                exit()
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                running = False
+# ==== Game Over Screen ====
+def game_over_screen(score, multiplayer=False, player1_name="", player2_name=""):
+    clock = pygame.time.Clock()
+    options = ["Replay", "Main Menu", "Quit"]
+    selected = 0
+    running = True
+    while running:
+        clock.tick(60)
+        win.blit(bg, (0, 0))
+        draw_text(win, " GAME OVER ", font_big, (255, 90, 90), (width // 2, 250))
+        draw_text(win, f"Final Score: {int(score)}", font_medium, (255, 255, 255), (width // 2, 400))
+        for i, opt in enumerate(options):
+            y = 600 + i * 120
+            rect = pygame.Rect(width // 2 - 300, y - 50, 600, 100)
+            hovered = i == selected
+            color = (255, 200, 100) if hovered else (180, 180, 255)
+            pygame.draw.rect(win, (20, 20, 40), rect, border_radius=25)
+            pygame.draw.rect(win, color, rect, 3, border_radius=25)
+            draw_text(win, opt, font_medium, color, (width // 2, y))
+        pygame.display.update()
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                exit()
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_UP:
+                    selected = (selected - 1) % len(options)
+                elif event.key == pygame.K_DOWN:
+                    selected = (selected + 1) % len(options)
+                elif event.key == pygame.K_RETURN:
+                    if options[selected] == "Replay":
+                        main(multiplayer, player1_name, player2_name)
+                        return
+                    elif options[selected] == "Main Menu":
+                        main_menu()
+                        return
+                    elif options[selected] == "Quit":
+                        pygame.quit()
+                        exit()
+# ====MainMenu====
+def main_menu():
+    clock = pygame.time.Clock()
+    options = ["Singleplayer", "Multiplayer", "Leaderboard", "Quit"]
+    selected = 0
+    running = True
+    while running:
+        clock.tick(60)
+        win.blit(bg, (0, 0))
+        glow = abs(int(180 + 75 * math.sin(pygame.time.get_ticks() / 500)))
+        draw_text(win, " SPACE DODGE ", font_big, (glow, glow, 255), (width // 2, 220))
+        #MenuNAV
+        for i, opt in enumerate(options):
+            y = 500 + i * 120
+            rect = pygame.Rect(width // 2 - 300, y - 50, 600, 100)
+            hovered = i == selected
+            color = (255, 200, 100) if hovered else (180, 180, 255)
+            glow_intensity = 5 if hovered else 2
+            pygame.draw.rect(win, (20, 20, 40), rect, border_radius=25)
+            pygame.draw.rect(win, color, rect, glow_intensity, border_radius=25)
+            draw_text(win, opt, font_medium, color, (width // 2, y))
+        draw_text(win, "Arrows to Navigation |  Enter for Confirmation", font_small, (180, 180, 255), (width // 2, height - 100))
+        pygame.display.update()
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                exit()
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_UP:
+                    selected = (selected - 1) % len(options)
+                elif event.key == pygame.K_DOWN:
+                    selected = (selected + 1) % len(options)
+                elif event.key == pygame.K_RETURN:
+                    choice = options[selected]
+                    if choice == "Singleplayer":
+                        p1 = get_player_name("Player 1")
+                        main(False, p1)
+                        return
+                    elif choice == "Multiplayer":
+                        p1 = get_player_name("Player 1")
+                        p2 = get_player_name("Player 2")
+                        main(True, p1, p2)
+                        return
+                    elif choice == "Leaderboard":
+                        show_leaderboard()
+                    elif choice == "Quit":
+                        pygame.quit()
+                        exit()
+# ====MainGame====
+def main(multiplayer=False, player1_name="Player1", player2_name="Player2"):
+    clock = pygame.time.Clock()
+    run = True
+    player1 = pygame.Rect(width // 2 - 100, height - 120, 60, 60)
+    player2 = pygame.Rect(width // 2 + 100, height - 120, 60, 60)
+    vel = 10
+    meteors = []
+    spawn_time = 0
+    score = 0
+    player1_alive = True
+    player2_alive = multiplayer
+    min_speed, max_speed = 4, 8
+    min_delay, max_delay = 500, 1500
+    speed_increase = 1.002
+    spawn_rate_increase = 0.998
+    while run:
+        clock.tick(60)
+        win.blit(bg, (0, 0))
+        score += 0.1
+        draw_text(win, f"Score: {int(score)}", font_medium, (255, 255, 255), (150, 50))
+        keys = pygame.key.get_pressed()
+        if player1_alive:
+            if keys[pygame.K_LEFT] and player1.x > 0:
+                player1.x -= vel
+            if keys[pygame.K_RIGHT] and player1.x < width - 60:
+                player1.x += vel
+            if keys[pygame.K_UP] and player1.y > 0:
+                player1.y -= vel
+            if keys[pygame.K_DOWN] and player1.y < height - 100:
+                player1.y += vel
+            win.blit(player1_img, player1)
+        if player2_alive:
+            if keys[pygame.K_a] and player2.x > 0:
+                player2.x -= vel
+            if keys[pygame.K_d] and player2.x < width - 60:
+                player2.x += vel
+            if keys[pygame.K_w] and player2.y > 0:
+                player2.y -= vel
+            if keys[pygame.K_s] and player2.y < height - 100:
+                player2.y += vel
+            win.blit(player2_img, player2)
+     #meteor spawn
+        if pygame.time.get_ticks() - spawn_time > random.randint(int(min_delay), int(max_delay)):
+            spawn_time = pygame.time.get_ticks()
+            x = random.randint(0, width - 80)
+            speed = random.uniform(min_speed, max_speed)
+            meteors.append((pygame.Rect(x, -80, 80, 80), speed))
+        new_meteors = []
+        for m, vel_m in meteors:
+            m.y += vel_m
+            if m.y <= height + 50:
+                new_meteors.append((m, vel_m))
+            win.blit(meteor_img, m)
+            if player1_alive and m.colliderect(player1):
+                save_score(player1_name, score)
+                player1_alive = False
+            if player2_alive and m.colliderect(player2):
+                save_score(player2_name, score)
+                player2_alive = False
+        meteors = new_meteors
+        if not player1_alive and not player2_alive:
+            run = False
+        min_speed *= speed_increase
+        max_speed *= speed_increase
+        min_delay *= spawn_rate_increase
+        max_delay *= spawn_rate_increase
+        min_speed = min(min_speed, 8)
+        max_speed = min(max_speed, 12)
+        min_delay = max(min_delay, 200)
+        max_delay = max(max_delay, 500)
+        pygame.display.update()
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                exit()
+    game_over_screen(score, multiplayer, player1_name, player2_name)
+# ====RunGame====
+if __name__ == "__main__":
+    main_menu()
